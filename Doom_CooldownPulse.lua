@@ -51,6 +51,33 @@ local function GetPetActionIndexByName(name)
     return nil
 end
 
+--------------------------
+-- 보호막 같은 버프 확인 --
+-- id = {enable, time_on, time_off}
+--------------------------
+local watchBuffs = {
+    [57623] = false, -- 겨울의 뿔피리
+    [49222] = false, -- 뼈의 보호막
+    [47440] = false, -- 지휘의 외침
+    [47436] = false, -- 전투의 외침
+}
+
+local function checkWatchBuff()
+    local name
+    for spellid, onoff in pairs(watchBuffs) do
+        name = GetSpellInfo(spellid)
+        if UnitBuff("player", name) then
+            watchBuffs[spellid] = true
+        else
+            if onoff then
+                local texture = GetSpellTexture(name)
+                cooldowns[name] = {GetTime(), 0, texture, false}
+                watchBuffs[spellid] = false
+            end
+        end
+    end
+end
+
 local function RefreshLocals()
     fadeInTime = DCP_Saved.fadeInTime
     fadeOutTime = DCP_Saved.fadeOutTime
@@ -60,6 +87,11 @@ local function RefreshLocals()
     holdTime = DCP_Saved.holdTime
 
     ignoredSpells = { }
+    for spellid in pairs(watchBuffs) do
+        local name = GetSpellInfo(spellid)
+        ignoredSpells[name] = true
+    end
+
     for _,v in ipairs({strsplit(",",DCP_Saved.ignoredSpells)}) do
         ignoredSpells[strtrim(v)] = true
     end
@@ -101,6 +133,9 @@ local function OnUpdate(_,update)
                 end
             end
         end
+
+        checkWatchBuff()
+        
         for i,v in pairs(cooldowns) do
             local remaining = v[2]-(GetTime()-v[1])
             if (remaining <= 0) then
