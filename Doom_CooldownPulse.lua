@@ -55,25 +55,54 @@ end
 -- 보호막 같은 버프 확인 --
 -- id = {enable, time_on, time_off}
 --------------------------
-local watchBuffs = {
-    [57623] = false, -- 겨울의 뿔피리
-    [49222] = false, -- 뼈의 보호막
-    [47440] = false, -- 지휘의 외침
-    [47436] = false, -- 전투의 외침
+local watchDeletedBuffs = {
+    [57623] = {onoff=false, filter="HELPFUL"}, -- 겨울의 뿔피리
+    [49222] = {onoff=false, filter="HELPFUL"}, -- 뼈의 보호막
+    [47440] = {onoff=false, filter="HELPFUL"}, -- 지휘의 외침
+    [47436] = {onoff=false, filter="HELPFUL"}, -- 전투의 외침
+    [53601] = {onoff=false, filter="HELPFUL"}, -- 성스러운 보호막
+    [48168] = {onoff=false, filter="HELPFUL"}, -- 내면의 열정
+    [48066] = {onoff=false, filter="HELPFUL"}, -- 보호막(사제)
+    [6346]  = {onoff=false, filter="HELPFUL"}, -- 공포의 수호물
+    [57960] = {onoff=false, filter="HELPFUL"}, -- 물의 보호막
+    [49281] = {onoff=false, filter="HELPFUL"}, -- 번개 보호막
+    [6788]  = {onoff=false, filter="HARMFUL"}, -- 악화된 영혼
 }
 
-local function checkWatchBuff()
-    local name
-    for spellid, onoff in pairs(watchBuffs) do
-        name = GetSpellInfo(spellid)
-        if UnitBuff("player", name) then
-            watchBuffs[spellid] = true
+local watchNewBuffs = {
+    [57578] = {onoff=false, filter="HELPFUL", stack=-1}, -- 전쟁의 기술
+    [67773] = {onoff=false, filter="HELPFUL", stack=-1}, -- 용자 - 죽음의 선택
+    [67708] = {onoff=false, filter="HELPFUL", stack=-1}, -- 용자 - 죽음의 선택
+    [71905] = {onoff=false, filter="HELPFUL", stack=7}, -- 영훈의 파편, 어둠한
+    [75456] = {onoff=false, filter="HELPFUL", stack=-1}, -- 날카로운 황혼 비늘
+    [53365] = {onoff=false, filter="HELPFUL", stack=-1}, -- 부정의 힘 - 죽기
+}
+
+local function checkDeletedBuffs()
+    for spellid, options in pairs(watchDeletedBuffs) do
+        local name, _, texture = GetSpellInfo(spellid)
+        if UnitAura("player", name, nil, options.filter) then
+            options.onoff = true
         else
-            if onoff then
-                local texture = GetSpellTexture(name)
+            if options.onoff then
                 cooldowns[name] = {GetTime(), 0, texture, false}
-                watchBuffs[spellid] = false
+                options.onoff = false
             end
+        end
+    end
+end
+--/script print(UnitAura("player", "영혼의 파편"))
+local function checkNewBuffs()
+    for spellid, options in pairs(watchNewBuffs) do
+        local name, _, texture = GetSpellInfo(spellid)
+        local spellname, _, _, stack  = UnitAura("player", name, nil, options.filter)        
+        if spellname then
+            if not options.onoff and options.stack <= stack then 
+                cooldowns[name] = {GetTime(), 0, texture, false} 
+                options.onoff = true
+            end            
+        else
+            options.onoff = false
         end
     end
 end
@@ -87,7 +116,7 @@ local function RefreshLocals()
     holdTime = DCP_Saved.holdTime
 
     ignoredSpells = { }
-    for spellid in pairs(watchBuffs) do
+    for spellid in pairs(watchDeletedBuffs) do
         local name = GetSpellInfo(spellid)
         ignoredSpells[name] = true
     end
@@ -134,7 +163,8 @@ local function OnUpdate(_,update)
             end
         end
 
-        checkWatchBuff()
+        checkDeletedBuffs()
+        checkNewBuffs()
         
         for i,v in pairs(cooldowns) do
             local remaining = v[2]-(GetTime()-v[1])
